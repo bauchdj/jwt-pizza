@@ -42,15 +42,6 @@ async function registerUser(page: Page) {
 	};
 }
 
-// async function it(
-// 	testName: string,
-// 	testFn: (page: Page) => Promise<void>
-// ) {
-// 	await test(testName, async ({ page }) => {
-// 		await testFn(page);
-// 	});
-// }
-
 async function mockApiAuthRoute(page: Page): Promise<void> {
 	console.log("mockApiAuthRoute - Setup");
 
@@ -136,4 +127,4 @@ function createUserInstance(
 	return user;
 }
 
-export { mockApiAuthPost, mockApiAuthRoute, registerAndLogout, registerUser };
+export { registerAndLogout, registerUser };
