@@ -6,8 +6,6 @@ test("should register new user, lougout, and login as that user successfully", a
 }) => {
 	const { email, password } = await registerAndLogout(page);
 
-	console.log(email, password);
-
 	await page.getByRole("link", { name: "Login" }).click();
 	await page.getByRole("textbox", { name: "Email address" }).fill(email);
 	await page.getByRole("textbox", { name: "Password" }).fill(password);

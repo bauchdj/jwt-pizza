@@ -43,11 +43,7 @@ async function registerUser(page: Page) {
 }
 
 async function mockApiAuthRoute(page: Page): Promise<void> {
-	console.log("mockApiAuthRoute - Setup");
-
 	await page.route("*/**/api/auth", async (route) => {
-		console.log("mockApiAuthRoute - Route", route.request().method());
-
 		const method = route.request().method();
 		let response;
 
@@ -71,24 +67,18 @@ async function mockApiAuthRoute(page: Page): Promise<void> {
 }
 
 function mockApiAuthPost() {
-	console.log("mockApiAuthPost");
-
 	const data: MockUserResponseData = createUserResponseData();
 
 	return data;
 }
 
 function mockApiAuthPut() {
-	console.log("mockApiAuthPut");
-
 	const data: MockUserResponseData = createUserResponseData();
 
 	return data;
 }
 
 function mockApiAuthDelete() {
-	console.log("mockApiAuthDelete");
-
 	const data = { message: "logout successful" };
 
 	return data;
