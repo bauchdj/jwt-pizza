@@ -8,6 +8,20 @@ interface MockUserResponseData {
 	token: string;
 }
 
+async function registerAndLogoutAndLogin(page: Page) {
+	const { email, password } = await registerAndLogout(page);
+
+	await page.getByRole("link", { name: "Login" }).click();
+	await page.getByRole("textbox", { name: "Email address" }).fill(email);
+	await page.getByRole("textbox", { name: "Password" }).fill(password);
+	await page.getByRole("button", { name: "Login" }).click();
+
+	await expect(page.getByRole("link", { name: "Logout" })).toBeVisible();
+	await expect(
+		page.getByRole("link", { name: "t", exact: true })
+	).toBeVisible();
+}
+
 async function registerAndLogout(page: Page) {
 	const registerUserData = await registerUser(page);
 
@@ -117,4 +131,4 @@ function createUserInstance(
 	return user;
 }
 
-export { registerAndLogout, registerUser };
+export { registerAndLogout, registerAndLogoutAndLogin, registerUser };
