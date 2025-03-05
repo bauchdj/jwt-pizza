@@ -15,11 +15,11 @@ permissions:
 jobs:
     release:
         runs-on: ubuntu-latest
-        env:
-            version: ${{ github.event.inputs.version }}
         environment:
             name: production
             url: https://pizza.borea.io
+        env:
+            version: ${{ github.event.inputs.version }}
         steps:
             - name: Create OIDC token to AWS
               uses: aws-actions/configure-aws-credentials@v4
@@ -42,7 +42,7 @@ jobs:
                   aws cloudfront create-invalidation --distribution-id ${{ secrets.DISTRIBUTION_ID }} --paths "/*"
 
             - name: Create production release
-              uses: ncipollo/release-action@v1.16.0
+              uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5
               with:
                   tag: production-version-${{ env.version }}
                   name: Production ${{ env.version }}
