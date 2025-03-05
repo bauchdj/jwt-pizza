@@ -7,7 +7,7 @@ on:
     workflow_dispatch:
 jobs:
     build:
-        name: Build
+        name: Build frontend
         runs-on: ubuntu-latest
         outputs:
             version: ${{ steps.set_version.outputs.version }}
@@ -18,7 +18,15 @@ jobs:
             - name: Setup Node
               uses: actions/setup-node@v4
               with:
-                  node-version: "20.x"
+                  node-version: "23.x"
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Tests
+              run: |
+                  npx playwright install --with-deps chromium
+                  npm run test:coverage
 
             - name: set version
               id: set_version
@@ -27,9 +35,15 @@ jobs:
                   echo "version=$version" >> "$GITHUB_OUTPUT"
                   printf '{"version": "%s" }' "$version" > public/version.json
 
+            - name: Update coverage
+              run: |
+                  coverage=$(jq '.total.lines.pct' coverage/coverage-summary.json)
+                  color=$(echo "$coverage < 80" | bc -l | awk '{if ($1) print "red"; else print "green"}')
+                  curl -s -X POST "https://badge.cs329.click/badge/${{ github.repository_owner }}/jwtpizzacoverage?label=Coverage&value=$coverage%25&color=$color" -H "authorization: bearer ${{ secrets.FACTORY_API_KEY }}" -o /dev/null
+
             - name: Build
               run: |
-                  npm ci && npm run build
+                  npm run build
                   cp dist/index.html dist/404.html
 
             - name: Update pages artifact
@@ -38,22 +52,14 @@ jobs:
                   name: package
                   path: dist/
 
-            - name: Run tests
-              run: |
-                  npx playwright install --with-deps chromium
-                  npm run test:coverage
-
-            - name: Update coverage
-              run: |
-                  coverage=$(jq '.total.lines.pct' coverage/coverage-summary.json)
-                  color=$(echo "$coverage < 80" | bc -l | awk '{if ($1) print "red"; else print "green"}')
-                  curl -s -X POST "https://badge.cs329.click/badge/${{ github.repository_owner }}/jwtpizzacoverage?label=Coverage&value=$coverage%25&color=$color" -H "authorization: bearer ${{ secrets.FACTORY_API_KEY }}" -o /dev/null
-
     deploy:
         needs: build
         permissions:
             id-token: write
         runs-on: ubuntu-latest
+        environment:
+            name: staging
+            url: https://stage-pizza.borea.io
         env:
             version: ${{needs.build.outputs.version}}
         steps:
@@ -73,5 +79,43 @@ jobs:
             - name: Push to AWS S3
               run: |
                   echo Deploying $version
-                  aws s3 cp dist s3://${{ secrets.APP_BUCKET }} --recursive
+                  aws s3 cp dist s3://${{ secrets.APP_BUCKET }}/$version --recursive
+
+            - name: Update staging version
+              run: |
+                  # Get the current distribution and update it to use the new version
+                  aws cloudfront get-distribution-config --id ${{ secrets.DISTRIBUTION_ID }} > original.json
+                  etag=$(jq -r '.ETag' original.json)
+                  jq '.DistributionConfig' original.json > request.json
+                  jq --arg version "/$version" '.Origins.Items[0].OriginPath = $version' request.json > finalRequest.json
+                  aws cloudfront update-distribution --id ${{ secrets.DISTRIBUTION_ID }} --if-match $etag --distribution-config file://finalRequest.json
+
+                  # Wait for the distribution to deploy and then invalidate the cache
+                  while [ "$(aws cloudfront get-distribution --id ${{ secrets.DISTRIBUTION_ID }} --query 'Distribution.Status' --output text)" != "Deployed" ]; do echo "Distribution is still updating..."; sleep 2; done
                   aws cloudfront create-invalidation --distribution-id ${{ secrets.DISTRIBUTION_ID }} --paths "/*"
+
+    release:
+        needs:
+            - build
+            - deploy
+        permissions:
+            id-token: write
+        runs-on: ubuntu-latest
+        environment:
+            name: staging
+            url: https://stage-pizza.borea.io
+        env:
+            version: ${{needs.build.outputs.version}}
+        steps:
+            - name: Create Staging Release
+              uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5
+              with:
+                  tag: stage-version-${{ env.version }}
+                  name: Staging ${{ env.version }}
+                  generateReleaseNotes: true
+                  body: |
+                      ## Description
+
+                      ${{ github.event.head_commit.message }}
+
+                      **commit**: ${{ github.sha }}
