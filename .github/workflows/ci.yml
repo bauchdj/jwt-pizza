@@ -98,8 +98,8 @@ jobs:
         needs:
             - build
             - deploy
-        # permissions:
-        #     contents: write
+        permissions:
+            contents: write
         runs-on: ubuntu-latest
         environment:
             name: staging
